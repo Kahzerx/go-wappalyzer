@@ -1,6 +1,7 @@
 package wappalyzer
 
 import (
+	"fmt"
 	"golang.org/x/net/html"
 	"net/http"
 	"net/url"
@@ -14,11 +15,23 @@ type WebPage struct {
 	meta    map[string]string
 }
 
-func NewWebpageFromResponse(response *http.Response) *WebPage {
+func NewWebpage(url string) (*WebPage, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create a valid request")
+	}
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("unable to do the request")
+	}
+	return NewWebpageFromResponse(response)
+}
+
+func NewWebpageFromResponse(response *http.Response) (*WebPage, error) {
 	rUrl := response.Request.URL
 	rHtml, err := html.Parse(response.Body)
 	if err != nil {
-		panic("Invalid html format")
+		return nil, fmt.Errorf("invalid html format")
 	}
 	headers := response.Header
 	htmlParser := newDocumentParser(rHtml)
@@ -52,5 +65,5 @@ func NewWebpageFromResponse(response *http.Response) *WebPage {
 		headers: headers,
 		scripts: scripts,
 		meta:    meta,
-	}
+	}, nil
 }

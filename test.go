@@ -2,22 +2,14 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"wappalyzer/wappalyzer"
 )
 
 func main() {
-	req, err := http.NewRequest(http.MethodGet, "https://github.com/", nil)
+	webPage, err := wappalyzer.NewWebpage("https://github.com/")
 	if err != nil {
-		log.Println("Unable to create a valid request")
-		return
+		log.Println(err)
 	}
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Println("Unable to do the request")
-		return
-	}
-	webPage := wappalyzer.NewWebpageFromResponse(response)
 	//_ = webPage
 	log.Println(webPage)
 }
