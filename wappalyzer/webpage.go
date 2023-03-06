@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"golang.org/x/net/html"
 	"net/http"
-	"net/url"
 )
 
 type WebPage struct {
-	url     *url.URL
+	url     string
 	html    *html.Node
 	headers map[string][]string
 	scripts []string
@@ -60,7 +59,7 @@ func NewWebpageFromResponse(response *http.Response) (*WebPage, error) {
 		meta[name] = content
 	}
 	return &WebPage{
-		url:     rUrl,
+		url:     rUrl.String(),
 		html:    rHtml,
 		headers: headers,
 		scripts: scripts,
