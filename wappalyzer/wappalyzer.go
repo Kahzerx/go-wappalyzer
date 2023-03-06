@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
 type Wappalyzer struct {
+	technologies     map[string]interface{}
+	confidenceRegexp *regexp.Regexp
 }
 
 func NewWappalyzer(update bool) *Wappalyzer {
@@ -30,8 +33,15 @@ func NewWappalyzer(update bool) *Wappalyzer {
 			continue
 		}
 		prepareTech(t)
+		//log.Println(fmt.Sprintf("%+v", tech))
 	}
-	return new(Wappalyzer)
+	wappalyzer := new(Wappalyzer)
+	wappalyzer.technologies = technologies
+	compile, _ := regexp.Compile("(.+)\\;confidence:(\\d+)")
+	wappalyzer.confidenceRegexp = compile
+	return wappalyzer
+}
+
 }
 
 func prepareTech(tech map[string]interface{}) {
@@ -50,6 +60,12 @@ func prepareTech(tech map[string]interface{}) {
 				continue
 			}
 			tech[k] = []string{strVal}
+		} else {
+			var patterns []string
+			for _, pat := range tech[k].([]interface{}) {
+				patterns = append(patterns, pat.(string))
+			}
+			tech[k] = patterns
 		}
 	}
 
@@ -77,6 +93,40 @@ func prepareTech(tech map[string]interface{}) {
 			tech[strings.ToLower(key)] = value
 		}
 	}
+
+	for _, k := range []string{"url", "html", "scriptSrc"} {
+		var patterns []map[string]interface{}
+		for _, t := range tech[k].([]string) {
+			patterns = append(patterns, preparePattern(t))
+		}
+		tech[k] = patterns
+	}
+	for _, k := range []string{"headers", "meta"} {
+		val := tech[k].(map[string]interface{})
+		for key, pattern := range val {
+			tech[k].(map[string]interface{})[key] = preparePattern(pattern.(string))
+		}
+	}
+}
+
+func preparePattern(pattern string) map[string]interface{} {
+	attrs := make(map[string]interface{})
+	patterns := strings.Split(pattern, "\\;")
+	for i, expr := range patterns {
+		if i == 0 {
+			attrs["string"] = expr
+			compile, err := regexp.Compile(fmt.Sprintf("(?i)%s", expr))
+			if err != nil {
+				log.Println(fmt.Sprintf("Unable to compile %s, skipping...", expr))
+				continue
+			}
+			attrs["regex"] = compile
+		} else {
+			attr := strings.SplitN(expr, ":", 2)
+			attrs[attr[0]] = attr[1]
+		}
+	}
+	return attrs
 }
 
 func ensureDirIsValid(techDir string) bool {
