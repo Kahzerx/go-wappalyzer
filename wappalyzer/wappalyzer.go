@@ -42,6 +42,30 @@ func NewWappalyzer(update bool) *Wappalyzer {
 	return wappalyzer
 }
 
+func (wp *Wappalyzer) AnalyzeWithVersions(page *WebPage) {
+	wp.Analyze(page)
+}
+
+func (wp *Wappalyzer) Analyze(page *WebPage) {
+	techsfound := make(map[string]bool)
+	_ = techsfound
+	for techName, tech := range wp.technologies {
+		if wp.hasTech(tech.(map[string]interface{}), page) {
+			techsfound[techName] = true
+		}
+	}
+}
+
+func (wp *Wappalyzer) hasTech(tech map[string]interface{}, page *WebPage) bool {
+	found := false
+	//log.Println(fmt.Sprintf("%+v", tech))
+	for _, pattern := range tech["url"].([]map[string]interface{}) {
+		p := pattern["regex"].(*regexp.Regexp)
+		if p.MatchString(page.url) {
+			log.Println("aaa")
+		}
+	}
+	return found
 }
 
 func prepareTech(tech map[string]interface{}) {
