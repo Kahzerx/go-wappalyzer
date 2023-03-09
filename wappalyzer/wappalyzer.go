@@ -54,15 +54,47 @@ func (wp *Wappalyzer) Analyze(page *WebPage) {
 			techsfound[techName] = true
 		}
 	}
+	//log.Println(fmt.Sprintf("%+v", page.scripts))
 }
 
 func (wp *Wappalyzer) hasTech(tech map[string]interface{}, page *WebPage) bool {
+	//log.Println("====")
+	//log.Println(tech)
 	found := false
 	//log.Println(fmt.Sprintf("%+v", tech))
 	for _, pattern := range tech["url"].([]map[string]interface{}) {
-		p := pattern["regex"].(*regexp.Regexp)
-		if p.MatchString(page.url) {
+		if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(page.url) {
 			log.Println("aaa")
+		}
+	}
+	for name, pattern := range tech["headers"].(map[string]interface{}) {
+		if headerContent := page.headers[name]; headerContent != nil && headerContent[0] != "" {
+			if p := pattern.(map[string]interface{})["regex"]; p != nil && p.(*regexp.Regexp).MatchString(headerContent[0]) {
+				log.Println("bbb")
+				found = true
+			}
+		}
+	}
+	for _, pattern := range tech["scriptSrc"].([]map[string]interface{}) {
+		for _, script := range page.scripts {
+			if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(script) {
+				log.Println("ccc")
+				found = true
+			}
+		}
+	}
+	for name, pattern := range tech["meta"].(map[string]interface{}) {
+		if metaContent := page.meta[name]; metaContent != "" {
+			if p := pattern.(map[string]interface{})["regex"]; p != nil && p.(*regexp.Regexp).MatchString(metaContent) {
+				log.Println("ddd")
+				found = true
+			}
+		}
+	}
+	for _, pattern := range tech["html"].([]map[string]interface{}) {
+		if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(page.rawHtml) {
+			log.Println("eee")
+			found = true
 		}
 	}
 	return found
@@ -138,12 +170,12 @@ func preparePattern(pattern string) map[string]interface{} {
 	patterns := strings.Split(pattern, "\\;")
 	for i, expr := range patterns {
 		if i == 0 {
-			attrs["string"] = expr
 			compile, err := regexp.Compile(fmt.Sprintf("(?i)%s", expr))
 			if err != nil {
 				log.Println(fmt.Sprintf("Unable to compile %s, skipping...", expr))
 				continue
 			}
+			attrs["string"] = expr
 			attrs["regex"] = compile
 		} else {
 			attr := strings.SplitN(expr, ":", 2)

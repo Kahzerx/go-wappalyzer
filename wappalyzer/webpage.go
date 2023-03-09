@@ -1,14 +1,16 @@
 package wappalyzer
 
 import (
+	"bytes"
 	"fmt"
 	"golang.org/x/net/html"
+	"io"
 	"net/http"
 )
 
 type WebPage struct {
 	url     string
-	html    *html.Node
+	rawHtml string
 	headers map[string][]string
 	scripts []string
 	meta    map[string]string
@@ -17,11 +19,11 @@ type WebPage struct {
 func NewWebpage(url string) (*WebPage, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create a valid request")
+		return nil, fmt.Errorf("unable to create a valid request! %s", err)
 	}
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("unable to do the request")
+		return nil, fmt.Errorf("unable to do the request! %s", err)
 	}
 	return NewWebpageFromResponse(response)
 }
@@ -30,10 +32,16 @@ func NewWebpageFromResponse(response *http.Response) (*WebPage, error) {
 	rUrl := response.Request.URL
 	rHtml, err := html.Parse(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("invalid html format")
+		return nil, fmt.Errorf("invalid html format! %s", err)
 	}
 	headers := response.Header
 	htmlParser := newDocumentParser(rHtml)
+	var buf bytes.Buffer
+	w := io.Writer(&buf)
+	err = html.Render(w, rHtml)
+	if err != nil {
+		return nil, fmt.Errorf("unable to render html! %s", err)
+	}
 	scriptNodes := htmlParser.findAll("script", boolKeyArgs{"src": true})
 	var scripts []string
 	for _, s := range scriptNodes {
@@ -60,7 +68,7 @@ func NewWebpageFromResponse(response *http.Response) (*WebPage, error) {
 	}
 	return &WebPage{
 		url:     rUrl.String(),
-		html:    rHtml,
+		rawHtml: buf.String(),
 		headers: headers,
 		scripts: scripts,
 		meta:    meta,

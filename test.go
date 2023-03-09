@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"wappalyzer/wappalyzer"
 )
@@ -14,5 +13,5 @@ func main() {
 	//log.Println(fmt.Sprintf("%+v", webPage))
 	wp := wappalyzer.NewWappalyzer(false)
 	wp.AnalyzeWithVersions(webPage)
-	log.Println(fmt.Sprintf("%+v", wp))
+	//log.Println(fmt.Sprintf("%+v", wp))
 }
