@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	webPage, err := wappalyzer.NewWebpage("https://github.com/")
+	webPage, err := wappalyzer.NewWebpage("https://www.20minutos.es/")
 	if err != nil {
 		log.Println(err)
 	}

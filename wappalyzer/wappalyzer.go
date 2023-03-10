@@ -37,7 +37,7 @@ func NewWappalyzer(update bool) *Wappalyzer {
 	}
 	wappalyzer := new(Wappalyzer)
 	wappalyzer.technologies = technologies
-	compile, _ := regexp.Compile("(.+)\\;confidence:(\\d+)")
+	compile, _ := regexp.Compile("(.+);confidence:(\\d+)")
 	wappalyzer.confidenceRegexp = compile
 	return wappalyzer
 }
@@ -54,7 +54,7 @@ func (wp *Wappalyzer) Analyze(page *WebPage) {
 			techsfound[techName] = true
 		}
 	}
-	//log.Println(fmt.Sprintf("%+v", page.scripts))
+	log.Println(fmt.Sprintf("%+v", wp.technologies))
 }
 
 func (wp *Wappalyzer) hasTech(tech map[string]interface{}, page *WebPage) bool {
@@ -64,13 +64,13 @@ func (wp *Wappalyzer) hasTech(tech map[string]interface{}, page *WebPage) bool {
 	//log.Println(fmt.Sprintf("%+v", tech))
 	for _, pattern := range tech["url"].([]map[string]interface{}) {
 		if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(page.url) {
-			log.Println("aaa")
+			wp.setDetectedTech(tech, "url", pattern, page.url, "")
 		}
 	}
 	for name, pattern := range tech["headers"].(map[string]interface{}) {
 		if headerContent := page.headers[name]; headerContent != nil && headerContent[0] != "" {
 			if p := pattern.(map[string]interface{})["regex"]; p != nil && p.(*regexp.Regexp).MatchString(headerContent[0]) {
-				log.Println("bbb")
+				wp.setDetectedTech(tech, "headers", pattern.(map[string]interface{}), headerContent[0], name)
 				found = true
 			}
 		}
@@ -78,7 +78,7 @@ func (wp *Wappalyzer) hasTech(tech map[string]interface{}, page *WebPage) bool {
 	for _, pattern := range tech["scriptSrc"].([]map[string]interface{}) {
 		for _, script := range page.scripts {
 			if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(script) {
-				log.Println("ccc")
+				wp.setDetectedTech(tech, "scriptSrc", pattern, script, "")
 				found = true
 			}
 		}
@@ -86,18 +86,68 @@ func (wp *Wappalyzer) hasTech(tech map[string]interface{}, page *WebPage) bool {
 	for name, pattern := range tech["meta"].(map[string]interface{}) {
 		if metaContent := page.meta[name]; metaContent != "" {
 			if p := pattern.(map[string]interface{})["regex"]; p != nil && p.(*regexp.Regexp).MatchString(metaContent) {
-				log.Println("ddd")
+				wp.setDetectedTech(tech, "meta", pattern.(map[string]interface{}), metaContent, name)
 				found = true
 			}
 		}
 	}
 	for _, pattern := range tech["html"].([]map[string]interface{}) {
 		if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(page.rawHtml) {
-			log.Println("eee")
+			wp.setDetectedTech(tech, "html", pattern, page.rawHtml, "")
 			found = true
 		}
 	}
+
+	if found {
+		if confidence := tech["confidence"]; confidence != nil {
+			total := 0
+			for _, v := range confidence.(map[string]interface{}) {
+				total += v.(int)
+			}
+			tech["confidenceTotal"] = total
+		}
+	}
+
 	return found
+}
+
+func (wp *Wappalyzer) setDetectedTech(tech map[string]interface{}, techType string, pattern map[string]interface{}, val string, key string) {
+	tech["detected"] = true
+
+	if key != "" {
+		key += " "
+	}
+	if confidence := tech["confidence"]; confidence == nil {
+		tech["confidence"] = make(map[string]interface{})
+	}
+	if confidence := pattern["confidence"]; confidence == nil {
+		pattern["confidence"] = 100
+	}
+	tech["confidence"].(map[string]interface{})[fmt.Sprintf("%s %s%s", techType, key, pattern["string"])] = pattern["confidence"]
+
+	version := pattern["version"]
+	if version != nil {
+		matches := pattern["regex"].(*regexp.Regexp).FindStringSubmatch(val)
+		if matches != nil {
+			version = matches[1]
+		}
+		if version != "" {
+			versions := tech["versions"]
+			if versions == nil {
+				tech["versions"] = []string{version.(string)}
+			} else {
+				exists := false
+				for _, v := range versions.([]string) {
+					if v == version {
+						exists = true
+					}
+				}
+				if !exists {
+					versions = append(versions.([]string), version.(string))
+				}
+			}
+		}
+	}
 }
 
 func prepareTech(tech map[string]interface{}) {
