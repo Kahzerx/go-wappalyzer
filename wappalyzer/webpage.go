@@ -29,19 +29,24 @@ func NewWebpage(url string) (*WebPage, error) {
 }
 
 func NewWebpageFromResponse(response *http.Response) (*WebPage, error) {
-	rUrl := response.Request.URL
+	rUrl := response.Request.URL.String()
 	rHtml, err := html.Parse(response.Body)
+	_ = response.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("invalid html format! %s", err)
 	}
 	headers := response.Header
-	htmlParser := newDocumentParser(rHtml)
 	var buf bytes.Buffer
 	w := io.Writer(&buf)
 	err = html.Render(w, rHtml)
 	if err != nil {
 		return nil, fmt.Errorf("unable to render html! %s", err)
 	}
+	return NewWebpageFromComponents(rUrl, rHtml, headers, buf.String())
+}
+
+func NewWebpageFromComponents(reqUrl string, parsedHtml *html.Node, headers http.Header, rawHtml string) (*WebPage, error) {
+	htmlParser := newDocumentParser(parsedHtml)
 	scriptNodes := htmlParser.findAll("script", boolKeyArgs{"src": true})
 	var scripts []string
 	for _, s := range scriptNodes {
@@ -67,8 +72,8 @@ func NewWebpageFromResponse(response *http.Response) (*WebPage, error) {
 		meta[name] = content
 	}
 	return &WebPage{
-		url:     rUrl.String(),
-		rawHtml: buf.String(),
+		url:     reqUrl,
+		rawHtml: rawHtml,
 		headers: headers,
 		scripts: scripts,
 		meta:    meta,
