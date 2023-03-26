@@ -30,13 +30,17 @@ type Wappalyzer struct {
 
 func NewWappalyzer(update bool) *Wappalyzer {
 	techDir := "technologies"
+	return NewWappalyzerWithDir(update, techDir)
+}
+
+func NewWappalyzerWithDir(update bool, jsonDir string) *Wappalyzer {
 	if update {
-		downloadTechs(techDir)
+		downloadTechs(jsonDir)
 	}
-	if !ensureDirIsValid(techDir) {
+	if !ensureDirIsValid(jsonDir) {
 		return nil
 	}
-	technologies := setupTechs(techDir)
+	technologies := setupTechs(jsonDir)
 	for name, tech := range technologies {
 		t, ok := tech.(map[string]interface{})
 		if !ok {
