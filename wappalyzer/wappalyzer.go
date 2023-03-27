@@ -14,12 +14,12 @@ import (
 )
 
 type Technologies struct {
-	technologyName string
+	TechnologyName string
 }
 
 type TechnologiesWithVersion struct {
-	technologyName string
-	versions       []string
+	TechnologyName string
+	Versions       []string
 }
 
 type Wappalyzer struct {
@@ -35,7 +35,10 @@ func NewWappalyzer(update bool) *Wappalyzer {
 
 func NewWappalyzerWithDir(update bool, jsonDir string) *Wappalyzer {
 	if update {
-		downloadTechs(jsonDir)
+		err := downloadTechs(jsonDir)
+		if err != nil {
+			return nil
+		}
 	}
 	if !ensureDirIsValid(jsonDir) {
 		return nil
@@ -62,7 +65,7 @@ func (wp *Wappalyzer) AnalyzeWithVersions(page *WebPage) []TechnologiesWithVersi
 	techsFound := wp.Analyze(page)
 	var res []TechnologiesWithVersion
 	for _, t := range techsFound {
-		detectedTech := wp.detectedTech[t.technologyName]
+		detectedTech := wp.detectedTech[t.TechnologyName]
 		var versions []string
 		if detectedTech != nil {
 			if v := detectedTech.(map[string]interface{})["versions"]; v != nil {
@@ -70,8 +73,8 @@ func (wp *Wappalyzer) AnalyzeWithVersions(page *WebPage) []TechnologiesWithVersi
 			}
 		}
 		res = append(res, TechnologiesWithVersion{
-			technologyName: t.technologyName,
-			versions:       versions,
+			TechnologyName: t.TechnologyName,
+			Versions:       versions,
 		})
 	}
 	return res
@@ -88,7 +91,7 @@ func (wp *Wappalyzer) Analyze(page *WebPage) []Technologies {
 	wp.getImplied(techsfound)
 	var res []Technologies
 	for tech := range techsfound {
-		res = append(res, Technologies{technologyName: tech})
+		res = append(res, Technologies{TechnologyName: tech})
 	}
 	return res
 	//log.Println(fmt.Sprintf("%+v", wp.technologies))
@@ -96,7 +99,7 @@ func (wp *Wappalyzer) Analyze(page *WebPage) []Technologies {
 
 func (wp *Wappalyzer) getImplied(techsFound map[string]bool) {
 	newFound := false
-	for tech, _ := range techsFound {
+	for tech := range techsFound {
 		for _, impl := range wp.technologies[tech].(map[string]interface{})["implies"].([]string) {
 			exists := techsFound[impl]
 			if !exists {
@@ -282,7 +285,7 @@ func preparePattern(pattern string) map[string]interface{} {
 		if i == 0 {
 			compile, err := regexp.Compile(fmt.Sprintf("(?i)%s", expr))
 			if err != nil {
-				log.Println(fmt.Sprintf("Unable to compile %s, skipping...", expr))
+				// log.Println(fmt.Sprintf("Unable to compile %s, skipping...", expr))
 				continue
 			}
 			attrs["string"] = expr
@@ -328,23 +331,27 @@ func setupTechs(techDir string) map[string]interface{} {
 	return technologies
 }
 
-func downloadTechs(techDir string) {
+func downloadTechs(techDir string) error {
 	asciiLowercase := "abcdefghijklmnopqrstuvwxyz_"
 	_ = os.Mkdir(techDir, os.ModePerm)
 	for _, letter := range strings.Split(asciiLowercase, "") {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://raw.githubusercontent.com/wappalyzer/wappalyzer/master/src/technologies/%s.json", letter), nil)
 		if err != nil {
-			return
+			return fmt.Errorf("request error")
 		}
 		response, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return
+			return fmt.Errorf("request error")
+		}
+		if response.StatusCode != 200 {
+			return fmt.Errorf("got status code %d", response.StatusCode)
 		}
 		bytes, err := io.ReadAll(response.Body)
 		if err != nil {
-			return
+			return fmt.Errorf("failed to read request body")
 		}
 		_ = response.Body.Close()
 		_ = os.WriteFile(fmt.Sprintf("%s/%s.json", techDir, letter), bytes, os.ModePerm)
 	}
+	return nil
 }
