@@ -118,16 +118,17 @@ func (wp *Wappalyzer) hasTech(techName string, tech map[string]interface{}, page
 	//log.Println(tech)
 	found := false
 	//log.Println(fmt.Sprintf("%+v", tech))
+	detectedT := make(map[string]interface{})
 
 	for _, pattern := range tech["url"].([]map[string]interface{}) {
 		if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(page.url) {
-			wp.setDetectedTech(techName, "url", pattern, page.url, "")
+			wp.setDetectedTech(detectedT, "url", pattern, page.url, "")
 		}
 	}
 	for name, pattern := range tech["headers"].(map[string]interface{}) {
 		if headerContent := page.headers[name]; headerContent != nil && headerContent[0] != "" {
 			if p := pattern.(map[string]interface{})["regex"]; p != nil && p.(*regexp.Regexp).MatchString(headerContent[0]) {
-				wp.setDetectedTech(techName, "headers", pattern.(map[string]interface{}), headerContent[0], name)
+				wp.setDetectedTech(detectedT, "headers", pattern.(map[string]interface{}), headerContent[0], name)
 				found = true
 			}
 		}
@@ -135,7 +136,7 @@ func (wp *Wappalyzer) hasTech(techName string, tech map[string]interface{}, page
 	for _, pattern := range tech["scriptSrc"].([]map[string]interface{}) {
 		for _, script := range page.scripts {
 			if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(script) {
-				wp.setDetectedTech(techName, "scriptSrc", pattern, script, "")
+				wp.setDetectedTech(detectedT, "scriptSrc", pattern, script, "")
 				found = true
 			}
 		}
@@ -143,16 +144,19 @@ func (wp *Wappalyzer) hasTech(techName string, tech map[string]interface{}, page
 	for name, pattern := range tech["meta"].(map[string]interface{}) {
 		if metaContent := page.meta[name]; metaContent != "" {
 			if p := pattern.(map[string]interface{})["regex"]; p != nil && p.(*regexp.Regexp).MatchString(metaContent) {
-				wp.setDetectedTech(techName, "meta", pattern.(map[string]interface{}), metaContent, name)
+				wp.setDetectedTech(detectedT, "meta", pattern.(map[string]interface{}), metaContent, name)
 				found = true
 			}
 		}
 	}
 	for _, pattern := range tech["html"].([]map[string]interface{}) {
 		if p := pattern["regex"]; p != nil && p.(*regexp.Regexp).MatchString(page.rawHtml) {
-			wp.setDetectedTech(techName, "html", pattern, page.rawHtml, "")
+			wp.setDetectedTech(detectedT, "html", pattern, page.rawHtml, "")
 			found = true
 		}
+	}
+	if len(detectedT) > 0 {
+		wp.detectedTech[techName] = detectedT
 	}
 
 	if found {
@@ -171,12 +175,7 @@ func (wp *Wappalyzer) hasTech(techName string, tech map[string]interface{}, page
 	return found
 }
 
-func (wp *Wappalyzer) setDetectedTech(techName string, techType string, pattern map[string]interface{}, val string, key string) {
-	detected := wp.detectedTech[techName]
-	if detected == nil {
-		wp.detectedTech[techName] = make(map[string]interface{})
-		detected = wp.detectedTech[techName]
-	}
+func (wp *Wappalyzer) setDetectedTech(detected interface{}, techType string, pattern map[string]interface{}, val string, key string) {
 	if key != "" {
 		key += " "
 	}
@@ -191,7 +190,7 @@ func (wp *Wappalyzer) setDetectedTech(techName string, techType string, pattern 
 	version := pattern["version"]
 	if version != nil {
 		matches := pattern["regex"].(*regexp.Regexp).FindStringSubmatch(val)
-		if matches != nil {
+		if matches != nil && len(matches) >= 2 {
 			version = matches[1]
 		}
 		if version != "" {
